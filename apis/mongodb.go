@@ -20,9 +20,9 @@ package apis
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 
-	connectivityv1alpha1 "github.developer.allianz.io/acp/provider-mongodb/apis/connectivity/v1alpha1"
-	organizationv1alpha1 "github.developer.allianz.io/acp/provider-mongodb/apis/organization/v1alpha1"
-	providerv1alpha1 "github.developer.allianz.io/acp/provider-mongodb/apis/v1alpha1"
+	connectivityv1alpha1 "github.com/svchaudhari/provider-mongodb-swap/apis/connectivity/v1alpha1"
+	organizationv1alpha1 "github.com/svchaudhari/provider-mongodb-swap/apis/organization/v1alpha1"
+	providerv1alpha1 "github.com/svchaudhari/provider-mongodb-swap/apis/v1alpha1"
 )
 
 func init() {

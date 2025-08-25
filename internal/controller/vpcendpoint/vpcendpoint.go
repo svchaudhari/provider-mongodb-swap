@@ -36,10 +36,10 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	"github.developer.allianz.io/acp/provider-mongodb/apis/connectivity/v1alpha1"
-	apisv1alpha1 "github.developer.allianz.io/acp/provider-mongodb/apis/v1alpha1"
-	svc "github.developer.allianz.io/acp/provider-mongodb/internal/clients/connectivity"
-	"github.developer.allianz.io/acp/provider-mongodb/internal/controller/features"
+	"github.com/svchaudhari/provider-mongodb-swap/apis/connectivity/v1alpha1"
+	apisv1alpha1 "github.com/svchaudhari/provider-mongodb-swap/apis/v1alpha1"
+	svc "github.com/svchaudhari/provider-mongodb-swap/internal/clients/connectivity"
+	"github.com/svchaudhari/provider-mongodb-swap/internal/controller/features"
 )
 
 const (

@@ -26,7 +26,7 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/providerconfig"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	"github.developer.allianz.io/acp/provider-mongodb/apis/v1alpha1"
+	"github.com/svchaudhari/provider-mongodb-swap/apis/v1alpha1"
 )
 
 // Setup adds a controller that reconciles ProviderConfigs by accounting for
