@@ -1,0 +1,50 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "customManagers": [
+      {
+        "customType": "regex",
+        "fileMatch": [
+          ".*y[a]?ml$",
+          "^Dockerfile$"
+        ],
+        "matchStrings": [
+          "#\\s?renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?( registryUrl=(?<registryUrl>.*?))?( extractVersion=(?<extractVersion>.*?))?( depDisplayName=(?<depDisplayName>.*?))?\\n.*version:\\s?[\"]?(?<currentValue>[\\w+\\.\\-]*)[\"]?",
+          "#\\s?renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?( registryUrl=(?<registryUrl>.*?))?( extractVersion=(?<extractVersion>.*?))?( depDisplayName=(?<depDisplayName>.*?))?\\n.*VERSION:\\s?[\"]?(?<currentValue>[\\w+\\.\\-]*)[\"]?",
+          "#\\s?renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?( registryUrl=(?<registryUrl>.*?))?( extractVersion=(?<extractVersion>.*?))?( depDisplayName=(?<depDisplayName>.*?))?\\n.*VERSION=\\s?[\"]?(?<currentValue>[\\w+\\.\\-]*)[\"]?",
+          "#\\s?renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?( registryUrl=(?<registryUrl>.*?))?( extractVersion=(?<extractVersion>.*?))?( depDisplayName=(?<depDisplayName>.*?))?\\n\\s+.*\\/.*:\\s?[\"]?(?<currentValue>[\\w+\\.\\-]*)[\"]?"
+        ],
+        "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}",
+        "extractVersionTemplate": "{{#if extractVersion}}{{{extractVersion}}}?(?<version>.*)${{else}}(?<version>.*)${{/if}}",
+        "depNameTemplate": "{{#if depDisplayName}}{{{depDisplayName}}}{{else}}{{{depName}}}{{/if}}",
+        "packageNameTemplate": "{{{depName}}}"
+      }
+    ],
+    "labels": [
+      "dependencies",
+      "renovate"
+    ],
+    "dependencyDashboard": true,
+    "packageRules": [
+      {
+        "managers": ["gomod"],
+        "groupName": "k8s modules",
+        "matchPackagePrefixes": [
+          "k8s.io",
+          "sigs.k8s.io"
+        ],
+         "addLabels": [
+          "k8s"
+        ]
+      },
+      {
+        "managers": ["gomod"],
+        "groupName": "crossplane modules",
+        "matchPackagePrefixes": [
+          "github.com/crossplane"
+        ],
+        "addLabels": [
+          "crossplane"
+        ]
+      }
+    ]
+  }

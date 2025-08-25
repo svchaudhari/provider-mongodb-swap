@@ -1,0 +1,14 @@
+# The OWNERS file is used by prow to automatically merge approved PRs.
+# approvers should know the code and system in detail
+# reviewers are responsible for a more thorough code review, discussing the implementation details and style
+
+approvers:
+  - florian-hopfensperger
+  - shinto-vincent-puthiry
+  - dhouha-maatoug
+  - barunavo-pal
+  - extern-ohradzansky-matej
+  - daniel-kraus-ext
+  - extern-leppelsack-hendrik
+reviewers:
+  - extern-leppelsack-hendrik

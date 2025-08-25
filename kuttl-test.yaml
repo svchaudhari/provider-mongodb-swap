@@ -1,0 +1,11 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestSuite
+testDirs:
+  - ./test/integration
+crdDir: package/crds
+parallel: 4
+timeout: 100
+manifestDirs: []
+commands:
+  - command: hack/terminate_child.sh ./_output/bin/$SAFEHOST_PLATFORM/$PROVIDER_NAME-controller --poll 10s
+    background: true

@@ -1,0 +1,18 @@
+apiVersion: connectivity.mongodb.allianz.io/v1alpha1
+kind: AWSPrivateLink
+metadata:
+  name: test-link
+spec:
+  forProvider:
+    vpcId: vpc-03a75e9d856407da5
+    serviceName: com.amazonaws.vpce.eu-central-1.vpce-svc-011670e6e0b0498c3
+    accountId: "198927051560"
+    subnetIds:
+    - subnet-000ff8403aca2347d
+    securityIds:
+    - sg-0333847892bf56879
+    region: eu-central-1
+    ipAddressType: ipv4
+    vpcEndpointType: Interface
+  providerConfigRef:
+    name: sample-config

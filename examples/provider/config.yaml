@@ -1,0 +1,12 @@
+---
+apiVersion: mongodb.allianz.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: sample-config
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      name: backupcreds
+      namespace: crossplane-system
+      key: credentials

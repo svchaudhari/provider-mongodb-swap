@@ -1,0 +1,14 @@
+/.cache
+/.work
+/_output
+cover.out
+/vendor
+/.vendor-new
+.vscode
+.idea
+.DS_Store
+__debug_bin
+Taskfile.yml
+Taskfile.yaml
+Taskfile.dist.yml
+examples/provider/config_temp.yaml

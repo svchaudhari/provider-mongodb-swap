@@ -1,0 +1,299 @@
+version: '3'
+
+#output:
+#  group:
+#    begin: '::group::{{ .TASK }}'
+#    end: '::end::'
+
+vars:
+  # Provider variables
+  PROVIDER_NAME: "provider-mongodb"
+  # Main variables
+  HOSTOS:
+    sh: "uname -s | tr '[:upper:]' '[:lower:]'"
+  HOSTARCH:
+    sh: "uname -m"
+  SAFEHOSTARCH: '{{ if eq .HOSTARCH "x86_64"}}amd64{{else}}{{ .HOSTARCH }}{{end}}'
+  SAFEHOSTPLATFORM: "{{ .HOSTOS }}-{{ .SAFEHOSTARCH }}"
+  SAFEHOST_PLATFORM: "{{ .HOSTOS }}_{{ .SAFEHOSTARCH }}"
+  SAFEHOSTOS: "{{ .HOSTOS }}/{{ .SAFEHOSTARCH }}"
+  TOOLS_HOST_DIR: "./.cache"
+  OUTPUT_DIR: "./_output"
+  # golangci-lint variables
+  GOLANGCILINT_VERSION: "1.51.1"
+  GOLANGCILINT: "{{ .TOOLS_HOST_DIR }}/golangci-lint-v{{ .GOLANGCILINT_VERSION }}"
+  GOLANGCILINT_ARGS: ""
+  # up variables
+  UP_VERSION: "0.15.0"
+  UP: "{{ .TOOLS_HOST_DIR }}/up-v{{ .UP_VERSION }}"
+  UP_ARGS: ""
+  UP_OUTPUT_DIR: "{{ .OUTPUT_DIR }}/xpkg"
+  # kubectl variables
+  KUBECTL_VERSION: "1.26.0"
+  KUBECTL: "{{ .TOOLS_HOST_DIR }}/kubectl_{{ .KUBECTL_VERSION }}/kubectl"
+  KUBECTL_ARGS: ""
+  # kubectl-kuttl variables
+  KUBECTL_KUTTL_VERSION: "0.15.0"
+  KUBECTL_KUTTL: "{{ .TOOLS_HOST_DIR }}/kubectl_{{ .KUBECTL_VERSION }}/kubectl-kuttl"
+  KUBECTL_KUTTL_ARGS: ""
+  # GO variables
+  GO: "go"
+  GO_BIN_DIR: "{{ .OUTPUT_DIR }}/bin"
+  # Docker variables
+  BUILD_REGISTRY: 'build-{{ expandenv "$HOST-$PWD" | sha256sum }}'
+  IMAGE_NAME: "{{ .BUILD_REGISTRY}}/{{ .PROVIDER_NAME }}"
+  IMAGE_TEMP_DIR:
+    sh: "mktemp -d"
+
+tasks:
+  init:
+    desc: Initializes build environment
+    internal: true
+    cmds:
+      - cmd: mkdir -p {{ .TOOLS_HOST_DIR }}
+      - cmd: mkdir -p {{ .OUTPUT_DIR }}
+    status:
+      - test -d {{ .TOOLS_HOST_DIR }}
+      - test -d {{ .OUTPUT_DIR }}
+
+  install:kubectl:
+    desc: Installs kubectl in local cache
+    deps:
+      - task: init
+    cmds:
+      - cmd: mkdir -p {{ .TOOLS_HOST_DIR }}/kubectl_{{ .KUBECTL_VERSION }}
+      - cmd: curl -fsSL "https://storage.googleapis.com/kubernetes-release/release/v{{ .KUBECTL_VERSION }}/bin/{{ .SAFEHOSTOS }}/kubectl" -o {{ .KUBECTL }}
+      - cmd: chmod +x {{ .KUBECTL }}
+    status:
+      - test -f {{ .KUBECTL }}
+
+  install:kubectl:kuttl:
+    desc: Installs kubectl-kuttl in local cache
+    deps:
+      - task: init
+    cmds:
+      - task: install:kubectl
+      - cmd: curl -fsSL "https://github.com/kudobuilder/kuttl/releases/download/v{{ .KUBECTL_KUTTL_VERSION }}/kubectl-kuttl_{{ .KUBECTL_KUTTL_VERSION }}_{{ .HOSTOS }}_{{ .HOSTARCH }}" -o {{ .KUBECTL_KUTTL }}
+      - cmd: chmod +x {{ .KUBECTL_KUTTL }}
+    status:
+      - test -f {{ .KUBECTL_KUTTL }}
+
+  install:golangci-lint:
+    desc: Installs golangci-lint in local cache
+    deps:
+      - task: init
+    cmds:
+      - cmd: mkdir -p {{ .TOOLS_HOST_DIR }}/tmp-golangci-lint
+      - cmd: curl -fsSL https://github.com/golangci/golangci-lint/releases/download/v{{ .GOLANGCILINT_VERSION }}/golangci-lint-{{ .GOLANGCILINT_VERSION }}-{{ .SAFEHOSTPLATFORM }}.tar.gz | tar -xz --strip-components=1 -C {{ .TOOLS_HOST_DIR }}/tmp-golangci-lint
+      - cmd: mv {{ .TOOLS_HOST_DIR }}/tmp-golangci-lint/golangci-lint {{ .GOLANGCILINT }}
+      - cmd: rm -fr {{ .TOOLS_HOST_DIR }}/tmp-golangci-lint
+    status:
+      - test -f {{ .GOLANGCILINT }}
+
+  # https://cli.upbound.io/stable/v0.15.0/bin/linux_amd64/up
+  install:up:
+    desc: Installs up in local cache
+    deps:
+      - task: init
+    cmds:
+      - cmd: curl -fsSL https://cli.upbound.io/stable/v{{ .UP_VERSION }}/bin/{{ .SAFEHOST_PLATFORM }}/up -o {{ .UP }}
+      - cmd: chmod +x {{ .UP }}
+    status:
+      - test -f {{ .UP }}
+
+  # TODO: Template dependencies list???
+  build:all:
+    desc: Builds target platforms binaries
+    deps:
+      - task: go:build:linux:amd64
+      - task: go:build:linux:arm64
+
+  build:host:
+    desc: Builds host platform binary
+    deps:
+      - task: go:build:safehost
+
+  image:all:
+    desc: Builds container images for target platforms
+    deps:
+      - task: docker:build:amd64
+      - task: docker:build:arm64
+
+  xpkg:all:
+    desc: Builds Crossplane packages for target platforms
+    deps:
+      - task: install:up
+      - task: image:all
+    cmds:
+      - task: xpkg:build:amd64
+      - task: xpkg:build:arm64
+
+  xpkg:publish:
+    desc: Publishes Crossplane package to image registry
+    deps:
+      - task: xpkg:all
+    cmds:
+      - cmd: >-
+          {{ .UP }} xpkg push
+          --package {{ .UP_OUTPUT_DIR }}/linux_amd64/{{ .PROVIDER_NAME}}.xpkg
+          --package {{ .UP_OUTPUT_DIR }}/linux_arm64/{{ .PROVIDER_NAME}}.xpkg
+          {{ .IMAGE_REGISTRY }}/{{ .PROVIDER_NAME }}:{{ .VERSION }}
+    vars:
+      VERSION: '{{ .VERSION | default "latest" }}'
+
+  generate:
+    desc: Generates Kubernetes API extension resources
+    cmds:
+      - cmd: go generate ./...
+      - cmd: go mod tidy
+    env:
+      CGO_ENABLED: '0'
+
+  lint:
+    desc: Lints Go code using golangci-lint
+    deps:
+      - install:golangci-lint
+    cmds:
+      - cmd: "{{ .GOLANGCILINT }} run {{ .GOLANGCILINT_ARGS }}"
+
+  test:
+    desc: Tests Go code using native toolset
+    cmds:
+      - task: go:test
+      - task: e2e
+
+  e2e:
+    desc: Runs end-to-end tests
+    deps:
+      - task: install:kubectl
+      - task: install:kubectl:kuttl
+    cmds:
+      - cmd: "chmod +x {{ .GO_BIN_DIR }}/{{ .SAFEHOST_PLATFORM }}/{{ .PROVIDER_NAME }}-controller"
+      - cmd: "PATH={{ .TOOLS_HOST_DIR }}/kubectl_{{ .KUBECTL_VERSION }}:$PATH {{ .KUBECTL }} kuttl test --start-kind"
+    env:
+      PROVIDER_NAME: "{{ .PROVIDER_NAME}}"
+      SAFEHOST_PLATFORM: "{{ .SAFEHOST_PLATFORM }}"
+
+  go:test:
+    desc: Runs Go tests
+    cmds:
+      - cmd: go test ./...
+    env:
+      CGO_ENABLED: "0"
+
+  go:build:linux:amd64:
+    desc: Builds linux/amd64 binary
+    internal: true
+    cmds:
+      - cmd: "{{ .GO }} build -a -o {{ .GO_BIN_DIR }}/{{ .GOOS }}_{{ .GOARCH }}/{{ .PROVIDER_NAME }}-controller cmd/provider/main.go"
+    env:
+      CGO_ENABLED: "0"
+      GOOS: "{{ .GOOS }}"
+      GOARCH: "{{ .GOARCH }}"
+    vars:
+      GOOS: "linux"
+      GOARCH: "amd64"
+
+  go:build:linux:arm64:
+    desc: Builds linux/arm64 binary
+    internal: true
+    cmds:
+      - cmd: "{{ .GO}} build -a -o {{ .GO_BIN_DIR }}/{{ .GOOS }}_{{ .GOARCH }}/{{ .PROVIDER_NAME }}-controller cmd/provider/main.go"
+    env:
+      CGO_ENABLED: "0"
+      GOOS: "{{ .GOOS }}"
+      GOARCH: "{{ .GOARCH }}"
+    vars:
+      GOOS: "linux"
+      GOARCH: "arm64"
+
+  go:build:safehost:
+    desc: Builds {{ .HOSTOS }}/{{ .SAFEHOSTARCH }} binary
+    internal: true
+    cmds:
+      - cmd: "{{ .GO}} build -a -o {{ .GO_BIN_DIR }}/{{ .SAFEHOST_PLATFORM }}/{{ .PROVIDER_NAME }}-controller cmd/provider/main.go"
+    env:
+      CGO_ENABLED: "0"
+      GOOS: "{{ .HOSTOS }}"
+      GOARCH: "{{ .SAFEHOSTARCH }}"
+
+  docker:build:amd64:
+    desc: Builds linux/amd64 container image
+    internal: true
+    cmds:
+      - cmd: 'cp cluster/images/{{ .PROVIDER_NAME }}/Dockerfile {{ .IMAGE_TEMP_DIR }} || echo "Files already copied by other task"'
+      - cmd: 'cp -r {{ .GO_BIN_DIR }} {{ .IMAGE_TEMP_DIR }} || echo "Files already copied by other task"'
+      - cmd: >-
+          docker buildx build
+          --load
+          --platform={{ .GOOS }}/{{ .GOARCH }}
+          --build-arg PROVIDER_NAME={{ .PROVIDER_NAME }}
+          --build-arg http_proxy={{ .HTTP_PROXY | default "" }}
+          --build-arg https_proxy={{ .HTTPS_PROXY | default "" }}
+          --build-arg no_proxy={{ .NO_PROXY | default "" }}
+          -t {{ .IMAGE_NAME }}-{{ .GOARCH }}
+          {{ .IMAGE_TEMP_DIR }}
+    vars:
+      GOOS: "linux"
+      GOARCH: "amd64"
+
+  docker:build:arm64:
+    desc: Builds linux/arm64 container image
+    internal: true
+    cmds:
+      - cmd: 'cp cluster/images/{{ .PROVIDER_NAME }}/Dockerfile {{ .IMAGE_TEMP_DIR }} || echo "Files already copied by other task"'
+      - cmd: 'cp -r {{ .GO_BIN_DIR }} {{ .IMAGE_TEMP_DIR }} || echo "Files already copied by other task"'
+      - cmd: >-
+          docker buildx build
+          --load
+          --platform={{ .GOOS }}/{{ .GOARCH }}
+          --build-arg PROVIDER_NAME={{ .PROVIDER_NAME }}
+          --build-arg http_proxy={{ .HTTP_PROXY | default "" }}
+          --build-arg https_proxy={{ .HTTPS_PROXY | default "" }}
+          --build-arg no_proxy={{ .NO_PROXY | default "" }}
+          -t {{ .IMAGE_NAME }}-{{ .GOARCH }}
+          {{ .IMAGE_TEMP_DIR }}
+    vars:
+      GOOS: "linux"
+      GOARCH: "arm64"
+
+  xpkg:build:amd64:
+    desc: Build Crossplane package
+    internal: true
+    cmds:
+      - cmd: mkdir -p {{ .UP_OUTPUT_DIR }}/{{ .GOOS }}_{{ .GOARCH }}/
+      - cmd: >-
+          {{ .UP }} xpkg build
+          --controller {{ .IMAGE_NAME }}-{{ .GOARCH }}
+          --package-root ./package/
+          --examples-root ./examples/
+          --output {{ .UP_OUTPUT_DIR }}/{{ .GOOS }}_{{ .GOARCH }}/{{ .PROVIDER_NAME}}.xpkg
+    vars:
+      GOOS: "linux"
+      GOARCH: "amd64"
+
+  xpkg:build:arm64:
+    desc: Build Crossplane package
+    internal: true
+    cmds:
+      - cmd: mkdir -p {{ .UP_OUTPUT_DIR }}/{{ .GOOS }}_{{ .GOARCH }}/
+      - cmd: >-
+          {{ .UP }} xpkg build
+          --controller {{ .IMAGE_NAME }}-{{ .GOARCH }}
+          --package-root ./package/
+          --examples-root ./examples/
+          --output {{ .UP_OUTPUT_DIR }}/{{ .GOOS }}_{{ .GOARCH }}/{{ .PROVIDER_NAME}}.xpkg
+    vars:
+      GOOS: "linux"
+      GOARCH: "arm64"
+
+  apply:
+    desc: Applies crds to kubernetes cluster
+    deps:
+      - task: install:kubectl
+    cmds:
+    - cmd: "{{ .KUBECTL }} apply -f package/crds/ -R"
+  run:
+    desc: Runs the provider out of cluster
+    cmds:
+    - cmd: "{{ .GO }} run cmd/provider/main.go -d"

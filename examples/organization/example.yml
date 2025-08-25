@@ -1,0 +1,16 @@
+apiVersion: organization.mongodb.allianz.io/v1alpha1
+kind: Organization
+metadata:
+  name: test-org
+spec:
+  forProvider:
+    ownerID: 616eafd9ec5b4a51a7c208db
+    apiKey:
+      description: initial org role
+      roles:
+      - ORG_OWNER
+    credentialSecretRef:
+      name: test-org
+      namespace: default
+  providerConfigRef:
+    name: sample-config

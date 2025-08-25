@@ -1,0 +1,15 @@
+aliases:
+  iac-platform:
+    - florian-hopfensperger
+    - shinto-vincent-puthiry
+    - egor-margineanu
+    - dhouha-maatoug
+    - barunavo-pal
+    - extern-ohradzansky-matej
+    - daniel-kraus-ext
+    - extern-leppelsack-hendrik
+    
+  # engineers of this service
+  service-team:
+    - extern-leppelsack-hendrik
+
